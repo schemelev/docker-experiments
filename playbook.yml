@@ -1,0 +1,63 @@
+---
+- hosts: all
+
+  tasks:
+    - name: Update APT sources
+      apt_key:
+        keyserver: hkp://p80.pool.sks-keyservers.net:80
+        id: 58118E89F3A912897C070ADBF76221572C52609D
+        state: present
+      become: yes
+
+
+    - shell: uname -r
+      register: uname_r_result
+    - shell: uname -s
+      register: uname_s_result
+    - shell: uname -m
+      register: uname_m_result
+
+    - name: install Prerequisites by Ubuntu Version
+      apt:
+        name: '{{ item }}'
+        state: present
+        update_cache: yes
+      with_items:
+        - linux-image-extra-{{ uname_r_result.stdout }}
+        - apparmor
+      become: yes
+
+    - name: Add entry for Ubuntu Trusty 14.04 (LTS)
+      lineinfile:
+        dest: /etc/apt/sources.list.d/docker.list
+        line: deb https://apt.dockerproject.org/repo ubuntu-trusty main
+        state: present
+        create: yes
+      become: yes
+
+    - name: Install Docker
+      apt:
+        name: '{{ item }}'
+        update_cache: yes
+        state: present
+      with_items:
+        - docker-engine
+      become: yes
+
+    - name: Start Docker demon
+      service:
+        name: docker
+        state: started
+
+    - name: Verify Docker is installed correctly
+      shell: docker run hello-world
+      become: yes
+
+    - name: Download Docker-compose
+      get_url:
+        url: 'https://github.com/docker/compose/releases/download/1.8.0/docker-compose-{{ uname_s_result.stdout }}-{{ uname_m_result.stdout }}'
+        dest: /usr/local/bin/docker-compose
+        mode: 0755
+        owner: root
+        group: root
+      become: yes
